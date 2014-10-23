@@ -12,7 +12,7 @@ RF24 radio(9,10);
 const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
 
 // The various roles supported by this sketch
-typedef enum { role_end_node = 1, role_base_station } role_e;	
+typedef enum { role_end_node = 1, role_base_station } role_e;
 
 // The role of the current running sketch
 role_e role;
@@ -20,6 +20,7 @@ role_e role;
 void setup_watchdog(uint8_t prescalar);
 void do_sleep(void);
 void work_time(void);
+
 
 const short sleep_cycles_per_transmission = SCPT;
 volatile short sleep_cycles_remaining = sleep_cycles_per_transmission;
@@ -33,13 +34,10 @@ void setup()
   role = role_end_node;
 
   Serial.begin(57600);
-  delay(2000);
+  delay(20);
 
   radio.begin();
-  // enable dynamic payloads
-  radio.enableDynamicPayloads(); 
-  // optionally, increase the delay between retries & # of retries
-  radio.setRetries(15,1);
+
   // Open the pipe for reading/writing
   if ( role == role_end_node )
   {
@@ -62,11 +60,11 @@ void loop()
   work_time();
 
   while( sleep_cycles_remaining )
-    do_sleep();
-    
+  do_sleep();
+
   sleep_cycles_remaining = sleep_cycles_per_transmission;
-}
-  
+  }
+
 void work_time(void)
 {
   // First, stop listening so we can talk.
@@ -75,7 +73,7 @@ void work_time(void)
   unsigned long time = millis();
   printf("Now sending %lu...",time);
   radio.write( &time, sizeof(unsigned long) );
-   // Power down the radio.
+  // Power down the radio.
   radio.powerDown();
 }
 
@@ -84,7 +82,7 @@ void setup_watchdog(uint8_t prescalar)
   prescalar = min(9,prescalar);
   uint8_t wdtcsr = prescalar & 7;
   if ( prescalar & 8 )
-  wdtcsr |= _BV(WDP3);
+    wdtcsr |= _BV(WDP3);
 
   MCUSR &= ~_BV(WDRF);
   WDTCSR = _BV(WDCE) | _BV(WDE);
@@ -100,6 +98,8 @@ void do_sleep(void)
 {
   set_sleep_mode(SLEEP_MODE_PWR_DOWN); // sleep mode is set here
   sleep_enable();
+
   sleep_mode();                        // System sleeps here
+
   sleep_disable();                     // System continues execution here when watchdog timed out
 }
