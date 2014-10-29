@@ -3,7 +3,7 @@
 #include <avr/power.h>
 #include "commonInterface.h"
 
-#define SCPT 180 // corresponds to 24 min sleep cycle
+#define SCPT 1 // corresponds to 24 min sleep cycle
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10
 RF24 radio(9,10);
@@ -35,24 +35,16 @@ void setup()
 
   Serial.begin(57600);
   delay(20);
+  printf_begin();
+  delay(1000);
 
   radio.begin();
 
-  // Open the pipe for reading/writing
-  if ( role == role_end_node )
-  {
-    radio.openWritingPipe(pipes[0]);
-    radio.openReadingPipe(1,pipes[1]);
-  }
-  else
-  {
-    radio.openWritingPipe(pipes[1]);
-    radio.openReadingPipe(1,pipes[0]);
-  }
-
-
+  radio.openWritingPipe(pipes[0]);
+  radio.openReadingPipe(1,pipes[1]);
+  
   // Prepare sleep parameters
-  setup_watchdog(wdt_8s);
+  setup_watchdog(wdt_1s);
 }
 
 void loop()
@@ -63,7 +55,7 @@ void loop()
   do_sleep();
 
   sleep_cycles_remaining = sleep_cycles_per_transmission;
-  }
+}
 
 void work_time(void)
 {
@@ -71,7 +63,7 @@ void work_time(void)
   radio.stopListening();
   // Take the time, and send it.  This will block until complete
   unsigned long time = millis();
-  printf("Now sending %lu...",time);
+  printf("Now sending %lu...\n",time);
   radio.write( &time, sizeof(unsigned long) );
   // Power down the radio.
   radio.powerDown();
@@ -82,7 +74,7 @@ void setup_watchdog(uint8_t prescalar)
   prescalar = min(9,prescalar);
   uint8_t wdtcsr = prescalar & 7;
   if ( prescalar & 8 )
-    wdtcsr |= _BV(WDP3);
+  wdtcsr |= _BV(WDP3);
 
   MCUSR &= ~_BV(WDRF);
   WDTCSR = _BV(WDCE) | _BV(WDE);
