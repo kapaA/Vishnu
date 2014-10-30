@@ -51,5 +51,14 @@ void loop(void)
       // due to it sleeping
       printf("Got payload %lu @ %lu...\n",got_time,millis());
     }
+    // First, stop listening so we can talk
+    radio.stopListening();
+
+    // Send the final one back.
+    radio.write( &got_time, sizeof(unsigned long) );
+    printf("Sent response.\n\r");
+
+    // Now, resume listening so we catch the next packets.
+    radio.startListening();
   }
 }

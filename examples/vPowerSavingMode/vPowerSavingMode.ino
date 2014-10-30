@@ -65,6 +65,33 @@ void work_time(void)
   unsigned long time = millis();
   printf("Now sending %lu...\n",time);
   radio.write( &time, sizeof(unsigned long) );
+  
+  // Now, listening for response
+  radio.startListening();
+  
+  // Wait here until we get a response, or timeout (250ms)
+  unsigned long started_waiting_at = millis();
+  bool timeout = false;
+  while ( ! radio.available() && ! timeout )
+    if (millis() - started_waiting_at > 250 )
+      timeout = true;
+      
+  // Describe the results
+  if ( timeout )
+  {
+    print("Failed, response timed out.\n\r");
+  }
+  else
+  {
+    // Grab the response, compare, and send to debugging spew
+    unsigned long got_time;
+    radio.read( &got_time, sizeof(unsigned long) );
+
+    // Spew it
+    printf("Got response %lu, round-trip delay: %lu\n\r",got_time,millis()-got_time);
+  }
+  
+  
   // Power down the radio.
   radio.powerDown();
 }
