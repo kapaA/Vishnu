@@ -13,6 +13,10 @@
         Date:      2014-10-31
     =========================================================================
 */
+
+#ifndef __COMON_VAR_H__
+#define __COMON_VAR_H__
+
 #ifndef ARDUINO
 typedef unsigned __int8 uint8_t;
 typedef unsigned __int32 uint32_t;
@@ -26,33 +30,31 @@ typedef enum { wdt_16ms = 0, wdt_32ms, wdt_64ms, wdt_128ms, wdt_250ms, wdt_500ms
  * Size: 28 bytes
 */
 typedef struct{
-  uint8_t reserved[29];         // 29 bytes
+  uint8_t data[2];         // 29 bytes
 }  pload;  
-  
+
 /**
-* Typedef struct containing Vishnu Large Data frame structure
-* Size: One frame is 32 bytes
+ * Typedef struct containing the header structure
+ * Size: 3 bytes
 */
-typedef struct
-{
+typedef struct{
   uint8_t  type    :4;    // 4 bits
   uint8_t srcAddr  :6;    // 6 bits
   uint8_t destAddr :6;    // 6 bits
   uint8_t seqNr;          // 1 byte
-  pload payload;          // 29 bytes
-} VLDFrame;
-
+}  head;  
+  
 /**
-* Typedef struct containing Vishnu Short Data frame structure
-* Size: One frame is 4 bytes
+* Typedef struct containing Vishnu  Data frame structure
+* Size: One frame is 32 bytes
 */
 typedef struct
 {
-  uint8_t  type    :4;    // 4 bits
-  uint8_t srcAddr  :6;    // 6 bits
-  uint8_t destAddr :6;    // 6 bits
-  uint8_t data;           // 2 byte
-} VSDFrame;
+  head header;    // 3 bytes 
+  pload payload;  // 29 bytes
+} VDFrame;
+
+
 
 /**
 * Typedef struct containing configuration info
@@ -63,3 +65,5 @@ typedef struct
   uint8_t frame_mode;
   uint8_t mac_addr;
 } configuration;
+
+#endif

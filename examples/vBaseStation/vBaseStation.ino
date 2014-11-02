@@ -1,4 +1,5 @@
 #include <SPI.h>
+#include "printf.h"
 #include <commonInterface.h>
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10
@@ -6,9 +7,6 @@ RF24 radio(9,10);
 
 // Radio pipe addresses for the 2 nodes to communicate.
 const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
-
-// The various roles supported by this sketch
-typedef enum { role_end_node = 1, role_base_station } role_e;
 
 // The role of the current running sketch
 role_e role;
