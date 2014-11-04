@@ -11,13 +11,25 @@ role_e role;
 
 void do_sleep(void);
 void work_time(void);
-uint8_t sendFrame(uint8_t frameMode, void *data, uint8_t dType);
+uint8_t sendFrame(pload *data);
 
 const short sleep_cycles_per_transmission = 1;
 volatile short sleep_cycles_remaining = 1;
 
 configuration config;
 static uint8_t configFlags = 0;
+
+GLOB_RET network_outgoing(pload *d);
+GLOB_RET network_incoming(pload *d);
+
+GLOB_RET mac_interface(char iKey, pload *d);
+GLOB_RET mac_outgoing(pload *d);
+GLOB_RET mac_incoming(pload *d);
+
+GLOB_RET phy_interface(char iKey, VDFrame *f);
+GLOB_RET phy_outgoing(VDFrame *d);
+GLOB_RET phy_incoming(VDFrame *d);
+
 
 void setup()
 {
@@ -36,7 +48,7 @@ void systemConfig(void)
   }
   if((configFlags&VFLAG_ROLE)==0 )
   {
-    config.rolde_id = role_undefined;
+    config.rolde_id = 1;
   }
   if ((configFlags&VFLAG_MAC_ADD)==0)
   {
@@ -78,45 +90,9 @@ void loop()
   sleep_cycles_remaining = sleep_cycles_per_transmission;
 }
 
-uint8_t sendFrame(uint8_t frameMode, void *data, uint8_t dType)
+uint8_t sendFrame(pload *data)
 {
-  if(FRAME_SHORT_MODE == frameMode)
-  {
-    uint8_t s = sizeof(&data);
-    if(s>5)
-    {
-      return 1;
-    }
-    else
-    {
-      VSDFrame fr;
-      fr.srcAddr  = config.mac_addr;
-      fr.destAddr = BS_MAC_ID;
-      fr.type = dType;
-      memcpy(&fr.data, data, sizeof(data));
-	  printf("Sending short data size[%d]\n",sizeof(fr));
-    }
-    
-  }
-  else if ( FRAME_LONGE_MODE == frameMode)
-  {
-    uint8_t s = sizeof(data);
-    if(s>LONGE_FRAME_SIZE)
-    {
-      return 1;
-    }
-    else
-    {
-      VLDFrame fr;
-      fr.srcAddr  = config.mac_addr;
-      fr.destAddr = BS_MAC_ID;
-      fr.type = dType;
-	  memcpy(&fr.payload.data, data, LONGE_FRAME_SIZE);
-	  printf("Sending longe data\n");
-      
-    }
-  }
-  
+  network_interface(OUTGOING, data);
   return 0;
 }
 
@@ -133,12 +109,191 @@ void do_sleep(void)
 
 int main(void)
 {
-	uint8_t d[2];
+  pload p;
 
-	d[0] = 24;
-	d[1] = 56;
-	readEeprom();
-	systemConfig();
+  p.data[0] = 24;
+  p.data[1] = 25;
+  readEeprom();
+  systemConfig();
 
-	sendFrame(FRAME_SHORT_MODE, &d, 1);
+  sendFrame(&p);
+}
+
+
+
+
+
+
+
+
+/*==============================================================================
+** Function...: network_interface
+** Return.....: GLOB_RET
+** Description: network layer interface. All call must go through this interface
+** Created....: 02.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
+
+GLOB_RET network_interface(char iKey, pload *f)
+{
+  GLOB_RET ret = GLOB_SUCCESS;
+
+  if (OUTGOING == iKey)
+  {
+    ret = network_outgoing(f);
+  }
+  else if (INCOMING == iKey)
+  {
+    ret = network_incoming(f);
+  }
+  else
+  {
+    ret = GLOB_ERROR_INVALID_PARAM;
+  }
+  return ret;
+}
+
+/*==============================================================================
+** Function...: network_outgoing
+** Return.....: GLOB_RET
+** Description: private function that handles all outgoing packets
+** Created....: 02.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
+
+GLOB_RET network_outgoing(pload *f)
+{
+  GLOB_RET ret = GLOB_SUCCESS;
+
+  mac_interface(OUTGOING, f);
+
+  return ret;
+}
+
+/*==============================================================================
+** Function...: network_incoming
+** Return.....: GLOB_RET
+** Description: private function that handles all incoming packets
+** Created....: 02.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
+
+GLOB_RET network_incoming(pload *f)
+{
+  GLOB_RET ret = GLOB_SUCCESS;
+
+  return ret;
+}
+
+/*==============================================================================
+** Function...: mac_interface
+** Return.....: GLOB_RET
+** Description: mac layer interface. All call must go through this interface
+** Created....: 02.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
+
+GLOB_RET mac_interface(char iKey, pload *f)
+{
+  GLOB_RET ret = GLOB_SUCCESS;
+
+  if (OUTGOING == iKey)
+  {
+    ret = mac_outgoing(f);
+  }
+  else if (INCOMING == iKey)
+  {
+    ret = mac_incoming(f);
+  }
+  else
+  {
+    ret = GLOB_ERROR_INVALID_PARAM;
+  }
+  return ret;
+}
+
+/*==============================================================================
+** Function...: mac_outgoing
+** Return.....: GLOB_RET
+** Description: private function that handles all outgoing packets
+** Created....: 02.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
+
+GLOB_RET mac_outgoing(pload *f)
+{
+  GLOB_RET ret = GLOB_SUCCESS;
+
+  return ret;
+}
+
+/*==============================================================================
+** Function...: mac_incoming
+** Return.....: GLOB_RET
+** Description: private function that handles all incoming packets
+** Created....: 02.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
+
+GLOB_RET mac_incoming(pload *f)
+{
+  GLOB_RET ret = GLOB_SUCCESS;
+
+  return ret;
+}
+
+
+/*==============================================================================
+** Function...: phy_interface
+** Return.....: GLOB_RET
+** Description: mac layer interface. All call must go through this interface
+** Created....: 02.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
+
+GLOB_RET phy_interface(char iKey, VDFrame *f)
+{
+  GLOB_RET ret = GLOB_SUCCESS;
+
+  if (OUTGOING == iKey)
+  {
+    ret = phy_outgoing(f);
+  }
+  else if (INCOMING == iKey)
+  {
+    ret = phy_incoming(f);
+  }
+  else
+  {
+    ret = GLOB_ERROR_INVALID_PARAM;
+  }
+  return ret;
+}
+
+/*==============================================================================
+** Function...: phy_outgoing
+** Return.....: GLOB_RET
+** Description: private function that handles all outgoing packets
+** Created....: 02.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
+
+GLOB_RET phy_outgoing(VDFrame *f)
+{
+  GLOB_RET ret = GLOB_SUCCESS;
+
+
+}
+
+/*==============================================================================
+** Function...: mac_incoming
+** Return.....: GLOB_RET
+** Description: private function that handles all incoming packets
+** Created....: 02.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
+
+GLOB_RET phy_incoming(VDFrame *f)
+{
+
 }

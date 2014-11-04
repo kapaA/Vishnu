@@ -41,7 +41,6 @@ typedef struct{
   uint8_t  type    :4;    // 4 bits
   uint8_t srcAddr  :6;    // 6 bits
   uint8_t destAddr :6;    // 6 bits
-  uint8_t seqNr;          // 1 byte
 }  head;  
   
 /**
@@ -66,4 +65,15 @@ typedef struct
   uint8_t mac_addr;
 } configuration;
 
+/*
+** ==========================================================================
+**                       Extern Global variables
+** ==========================================================================
+*/
+
+
+extern configuration config;
+
+
 #endif
+

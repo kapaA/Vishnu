@@ -17,5 +17,5 @@ void readEeprom(void);
 void writeEeprom(uint8_t add, uint8_t data);
 
 GLOB_RET network_interface(char iKey, pload *d);
-GLOB_RET network_outgoing( pload *d);
-GLOB_RET network_incoming( pload *d );
+
+

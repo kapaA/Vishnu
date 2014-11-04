@@ -8,7 +8,7 @@
     authorization.
     ============================================================================
     Revision Information:
-        File name: networkLayer.c
+        File name: macLayer.c
         Version:   v0.0
         Date:      2014-11-02
     ============================================================================
@@ -19,74 +19,64 @@
 ==============================================================================*/
 #include "commonInterface.h"
 
-GLOB_RET network_outgoing( pload *d);
-GLOB_RET network_incoming( pload *d );
+GLOB_RET mac_outgoing( VDFrame *d);
+GLOB_RET mac_incoming( VDFrame *d );
 
-GLOB_RET mac_interface(char iKey, VDFrame *d);
-
-
+GLOB_RET phy_interface(char iKey, VDFrame *f);
 
 /*==============================================================================
-** Function...: network_interface
+** Function...: mac_interface
 ** Return.....: GLOB_RET
-** Description: network layer interface. All call must go through this interface
+** Description: mac layer interface. All call must go through this interface
 ** Created....: 02.11.2014 by Achuthan
 ** Modified...: dd.mm.yyyy by nn
 ==============================================================================*/
 
-GLOB_RET network_interface(char iKey, pload *f)
+GLOB_RET mac_interface(char iKey, VDFrame *f)
 {
-  GLOB_RET ret = GLOB_SUCCESS;
+    GLOB_RET ret = GLOB_SUCCESS;
 
-  if(OUTGOING==iKey)
-  {
-    ret = network_outgoing(f);
-  }
-  else if (INCOMING == iKey)
-  {
-    ret = network_incoming(f);
-  }
-  else
-  {
-    ret = GLOB_ERROR_INVALID_PARAM;
-  }
-  return ret;
-}
+    if(OUTGOING==iKey)
+    {
+      ret = mac_outgoing(f);
+    }
+    else if (INCOMING == iKey)
+    {
+      ret = mac_incoming(f);
+    }
+    else
+    {
+      ret = GLOB_ERROR_INVALID_PARAM;
+    }
+    return ret;
+}  
 
 /*==============================================================================
-** Function...: network_outgoing
+** Function...: mac_outgoing
 ** Return.....: GLOB_RET
 ** Description: private function that handles all outgoing packets
 ** Created....: 02.11.2014 by Achuthan
 ** Modified...: dd.mm.yyyy by nn
 ==============================================================================*/
 
-GLOB_RET network_outgoing( pload *d)
+GLOB_RET mac_outgoing( VDFrame *f)
 {
   GLOB_RET ret = GLOB_SUCCESS;
   
-  VDFrame fr;
-  
-  fr.header.destAddr = BS_MAC_ID;
-  fr.header.srcAddr  = config.mac_addr;
-  fr.header.type     = config.frame_mode;
-  
-  memcpy(&fr.payload.data, d, sizeof(fr.payload.data));
-  
-  mac_interface(OUTGOING, &fr);
+  phy_interface(OUTGOING, f);
   
   return ret;
 }
 
 /*==============================================================================
-** Function...: network_incoming
+** Function...: mac_incoming
 ** Return.....: GLOB_RET
 ** Description: private function that handles all incoming packets
 ** Created....: 02.11.2014 by Achuthan
 ** Modified...: dd.mm.yyyy by nn
 ==============================================================================*/
 
-GLOB_RET network_incoming( pload *f)
+GLOB_RET mac_incoming( VDFrame *f)
 {
   GLOB_RET ret = GLOB_SUCCESS;
 

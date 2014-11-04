@@ -5,6 +5,8 @@
 #include "printf.h"
 #include "commonInterface.h"
 
+#define DEBUG
+
 #define SCPT 1 // corresponds to 24 min sleep cycle
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10
@@ -30,6 +32,12 @@ volatile short sleep_cycles_remaining = sleep_cycles_per_transmission;
 configuration config;
 static uint8_t configFlags = 0;
 
+
+GLOB_RET phy_outgoing( VDFrame *d);
+GLOB_RET phy_incoming( VDFrame *d );
+
+
+
 void setup()
 {
   readEeprom();
@@ -40,6 +48,7 @@ void setup()
   MCUCR = _BV (BODS);
 
   role = role_end_node;
+  
 
   Serial.begin(57600);
   delay(20);
@@ -102,42 +111,39 @@ void readEeprom(void)
 
 void loop()
 {
-  pload pl;
-  uint8_t i;
-  
-  pl.data[0] = 24;
-  pl.data[1] = 64;
-  
-  
-  i = sizeof(pl);
-  printf("size %d\n",i);
-  
+
   work_time();
 
   while( sleep_cycles_remaining )
   do_sleep();
 
   sleep_cycles_remaining = sleep_cycles_per_transmission;
-  
-  
-  
-  sendFrame(&pl);
 }
 
 uint8_t sendFrame(pload *data)
 {
   network_interface(OUTGOING, data);
+  
+  return 0;
 }
 
 
 void work_time(void)
-{
+{ 
+  
+  VDFrame fr;
+  
+  fr.header.destAddr = BS_MAC_ID;
+  fr.header.srcAddr  = config.mac_addr;
+  fr.header.type     = config.frame_mode;
+  fr.payload.data[0] = 23;
+  fr.payload.data[1] = 24;
+
   // First, stop listening so we can talk.
   radio.stopListening();
   // Take the time, and send it.  This will block until complete
-  unsigned long time = millis();
-  printf("Now sending %lu...\n",time);
-  radio.write( &time, sizeof(unsigned long) );
+  
+  radio.write( &fr, sizeof(unsigned long) );
   
   // Now, listening for response
   radio.startListening();
@@ -152,7 +158,9 @@ void work_time(void)
   // Describe the results
   if ( timeout )
   {
-    printf("Failed, response timed out.\n\r");
+    #ifdef DEBUG
+      printf("Failed, response timed out.\n\r");
+      #endif
   }
   else
   {
@@ -161,9 +169,10 @@ void work_time(void)
     radio.read( &got_time, sizeof(unsigned long) );
 
     // Spew it
-    printf("Got response %lu, round-trip delay: %lu\n\r",got_time,millis()-got_time);
+    #ifdef DEBUG
+      printf("Got response %lu, round-trip delay: %lu\n\r",got_time,millis()-got_time);
+      #endif
   }
-  
   
   // Power down the radio.
   radio.powerDown();
@@ -194,4 +203,92 @@ void do_sleep(void)
   sleep_mode();                        // System sleeps here
 
   sleep_disable();                     // System continues execution here when watchdog timed out
+}
+
+/*---------------------------------------------------------------------------------------------------------------------------*/
+
+/*==============================================================================
+** Function...: phy_interface
+** Return.....: GLOB_RET
+** Description: mac layer interface. All call must go through this interface
+** Created....: 02.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
+
+GLOB_RET phy_interface(char iKey, VDFrame *f)
+{
+  GLOB_RET ret = GLOB_SUCCESS;
+
+  if(OUTGOING==iKey)
+  {
+    ret = phy_outgoing(f);
+  }
+  else if (INCOMING == iKey)
+  {
+    ret = phy_incoming(f);
+  }
+  else
+  {
+    ret = GLOB_ERROR_INVALID_PARAM;
+  }
+  return ret;
+}
+
+/*==============================================================================
+** Function...: phy_outgoing
+** Return.....: GLOB_RET
+** Description: private function that handles all outgoing packets
+** Created....: 02.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
+
+GLOB_RET phy_outgoing( VDFrame *f)
+{
+  GLOB_RET ret = GLOB_SUCCESS;
+  
+  // First, stop listening so we can talk.
+  radio.stopListening();
+  
+  // Send the frame
+  radio.write( f, sizeof(unsigned long) );
+  
+  // Now, listening for response
+  radio.startListening();
+  
+  // Wait here until we get a response, or timeout (250ms)
+  unsigned long started_waiting_at = millis();
+  bool timeout = false;
+  while ( ! radio.available() && ! timeout )
+  if (millis() - started_waiting_at > 250 )
+  timeout = true;
+  
+  // Describe the results
+  if ( timeout )
+  {
+    #ifdef DEBUG
+      printf("Failed, response timed out.\n\r");
+    #endif
+  }
+  else
+  {
+    #ifdef DEBUG
+      printf("Got it.\n\r");
+    #endif
+  }
+  
+  // Power down the radio.
+  radio.powerDown();
+}
+
+/*==============================================================================
+** Function...: mac_incoming
+** Return.....: GLOB_RET
+** Description: private function that handles all incoming packets
+** Created....: 02.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
+
+GLOB_RET phy_incoming( VDFrame *f)
+{
+  
 }
