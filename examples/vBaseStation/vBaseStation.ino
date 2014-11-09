@@ -21,6 +21,7 @@ void setup()
   delay(1000);
 
   radio.begin();
+
   // Open the pipe for reading/writing
   
   radio.openWritingPipe(pipes[1]);
@@ -37,26 +38,38 @@ void loop(void)
   // if there is data ready
   if ( radio.available() )
   {
+    
+    VDFrame frRx, frTx;
+    
     // Dump the payloads until we've gotten everything
     unsigned long got_time;
     bool done = false;
     while (!done)
     {
       // Fetch the payload, and see if this was the last one.
-      done = radio.read( &got_time, sizeof(unsigned long) );
+      done = radio.read( &frRx, sizeof(frRx) );
 
       // Spew it.  Include our time, because the ping_out millis counter is unreliable
       // due to it sleeping
-      printf("Got payload %lu @ %lu...\n",got_time,millis());
+      printf("%d %d %d %d\n", frRx.header.srcAddr, frRx.header.type, frRx.payload.data[0], frRx.payload.data[1] );
     }
+    
+    /*
     // First, stop listening so we can talk
     radio.stopListening();
+    
+    
+    frTx.header.destAddr = frRx.header.srcAddr;
+    frTx.header.srcAddr  = BS_MAC_ID;
+    frTx.header.type     = 1;
+    frTx.payload.data[0] = 00;
+    frTx.payload.data[1] = 00;
 
     // Send the final one back.
-    radio.write( &got_time, sizeof(unsigned long) );
-    printf("Sent response.\n\r");
+    radio.write( &frTx, sizeof(frTx) );
 
     // Now, resume listening so we catch the next packets.
     radio.startListening();
+    */
   }
 }

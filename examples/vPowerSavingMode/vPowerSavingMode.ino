@@ -5,9 +5,9 @@
 #include "printf.h"
 #include "commonInterface.h"
 
-#define DEBUG
+//#define DEBUG
 
-#define SCPT 1 // corresponds to 24 min sleep cycle
+#define SCPT 5 // corresponds to 24 min sleep cycle
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10
 RF24 radio(9,10);
@@ -24,9 +24,7 @@ void work_time(void);
 
 uint8_t sendFrame(pload *data);
 
-
-const short sleep_cycles_per_transmission = SCPT;
-volatile short sleep_cycles_remaining = sleep_cycles_per_transmission;
+volatile short sleep_cycles_remaining = SCPT;
 
 
 configuration config;
@@ -36,7 +34,7 @@ static uint8_t configFlags = 0;
 GLOB_RET phy_outgoing( VDFrame *d);
 GLOB_RET phy_incoming( VDFrame *d );
 
-
+unsigned long seqNum = 0;
 
 void setup()
 {
@@ -57,11 +55,6 @@ void setup()
 
   radio.begin();
   
-  // enable dynamic payloads
-  // radio.enableDynamicPayloads();
-  // optionally, increase the delay between retries & # of retries
-  //radio.setRetries(15,15);
-
   radio.openWritingPipe(pipes[0]);
   radio.openReadingPipe(1,pipes[1]);
   
@@ -117,7 +110,7 @@ void loop()
   while( sleep_cycles_remaining )
   do_sleep();
 
-  sleep_cycles_remaining = sleep_cycles_per_transmission;
+  sleep_cycles_remaining = SCPT;
 }
 
 uint8_t sendFrame(pload *data)
@@ -129,22 +122,25 @@ uint8_t sendFrame(pload *data)
 
 
 void work_time(void)
-{ 
+{
   
   VDFrame fr;
   
   fr.header.destAddr = BS_MAC_ID;
-  fr.header.srcAddr  = config.mac_addr;
+  fr.header.srcAddr  = 0x02;//config.mac_addr;
   fr.header.type     = config.frame_mode;
-  fr.payload.data[0] = 23;
+  fr.payload.data[0] = seqNum;
   fr.payload.data[1] = 24;
+  
+  seqNum++;
 
   // First, stop listening so we can talk.
   radio.stopListening();
   // Take the time, and send it.  This will block until complete
   
-  radio.write( &fr, sizeof(unsigned long) );
+  radio.write( &fr, sizeof(fr) );
   
+  /*
   // Now, listening for response
   radio.startListening();
   
@@ -159,21 +155,21 @@ void work_time(void)
   if ( timeout )
   {
     #ifdef DEBUG
-      printf("Failed, response timed out.\n\r");
-      #endif
+    printf("Failed, response timed out.\n\r");
+    #endif
   }
   else
   {
     // Grab the response, compare, and send to debugging spew
     unsigned long got_time;
-    radio.read( &got_time, sizeof(unsigned long) );
+    radio.read( &fr, sizeof(unsigned long) );
 
     // Spew it
     #ifdef DEBUG
-      printf("Got response %lu, round-trip delay: %lu\n\r",got_time,millis()-got_time);
-      #endif
+    printf("Got data %d %d %d %d\n", fr.header.srcAddr, fr.header.type, fr.payload.data[0], fr.payload.data[1] );
+    #endif
   }
-  
+  */
   // Power down the radio.
   radio.powerDown();
 }
@@ -266,13 +262,13 @@ GLOB_RET phy_outgoing( VDFrame *f)
   if ( timeout )
   {
     #ifdef DEBUG
-      printf("Failed, response timed out.\n\r");
+    printf("Failed, response timed out.\n\r");
     #endif
   }
   else
   {
     #ifdef DEBUG
-      printf("Got it.\n\r");
+    printf("Got it.\n\r");
     #endif
   }
   
