@@ -21,6 +21,13 @@ void setup()
   delay(1000);
 
   radio.begin();
+  
+  // optionally, increase the delay between retries & # of retries
+  radio.setRetries(15,15);
+
+  // optionally, reduce the payload size.  seems to
+  // improve reliability
+  radio.setPayloadSize(4);
 
   // Open the pipe for reading/writing
   
@@ -54,7 +61,7 @@ void loop(void)
       printf("%d %d %d %d\n", frRx.header.srcAddr, frRx.header.type, frRx.payload.data[0], frRx.payload.data[1] );
     }
     
-    /*
+    
     // First, stop listening so we can talk
     radio.stopListening();
     
@@ -70,6 +77,6 @@ void loop(void)
 
     // Now, resume listening so we catch the next packets.
     radio.startListening();
-    */
+    
   }
 }
