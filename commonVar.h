@@ -30,12 +30,12 @@ typedef enum { wdt_16ms = 0, wdt_32ms, wdt_64ms, wdt_128ms, wdt_250ms, wdt_500ms
  * Size: 28 bytes
 */
 typedef struct{
-  uint8_t data[2];         // 29 bytes
+  uint8_t data[2];         // 2 bytes
 }  pload;  
 
 /**
  * Typedef struct containing the header structure
- * Size: 3 bytes
+ * Size: 2 bytes
 */
 typedef struct{
   uint8_t  type    :4;    // 4 bits
@@ -45,12 +45,12 @@ typedef struct{
   
 /**
 * Typedef struct containing Vishnu  Data frame structure
-* Size: One frame is 32 bytes
+* Size: One frame is 5 bytes long
 */
 typedef struct
 {
   head header;    // 3 bytes 
-  pload payload;  // 29 bytes
+  pload payload;  // 2 bytes
 } VDFrame;
 
 
