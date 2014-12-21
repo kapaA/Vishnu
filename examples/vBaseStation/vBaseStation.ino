@@ -27,7 +27,7 @@ void setup()
 
   // optionally, reduce the payload size.  seems to
   // improve reliability
-  radio.setPayloadSize(4);
+  radio.setPayloadSize(5);
 
   // Open the pipe for reading/writing
   

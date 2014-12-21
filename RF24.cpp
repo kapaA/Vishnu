@@ -384,7 +384,7 @@ void RF24::begin(void)
   // Set up default configuration.  Callers can always change it later.
   // This channel should be universally safe and not bleed over into adjacent
   // spectrum.
-  setChannel(76);
+  setChannel(75);
 
   // Flush buffers
   flush_rx();

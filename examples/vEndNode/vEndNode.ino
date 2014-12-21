@@ -49,8 +49,11 @@ role_e role;
 
 unsigned long seqNum = 0;
 
-const short sleep_cycles_per_transmission = 4;
+const short sleep_cycles_per_transmission = 2;
 volatile short sleep_cycles_remaining = sleep_cycles_per_transmission;
+
+// store the state of register ADCSRA
+byte keep_ADCSRA;
 
 
 /*
@@ -71,6 +74,11 @@ void do_sleep(void);
 ==============================================================================*/
 void setup()
 {
+  
+  // turn off brown-out enable in software
+  MCUCR = bit (BODS) | bit (BODSE);
+  MCUCR = bit (BODS);
+  
   //Start Serial communication
   Serial.begin(57600);
   delay(20);
@@ -81,7 +89,7 @@ void setup()
   //Setup watchdog to interrupt every 1 sec.
   setup_watchdog(wdt_1s);
   
-  // Start the transceiver 
+  // Start the transceiver   
   radio.begin();
   // set the delay between retries & # of retries
   radio.setRetries(15,15);
@@ -112,21 +120,36 @@ void loop()
   VDFrame fr;
   
   fr.header.destAddr = BS_MAC_ID;
-  fr.header.srcAddr  = 0x01;//config.mac_addr;
+  fr.header.srcAddr  = 0x03;//config.mac_addr;
   fr.header.type     = 1;
   fr.payload.data[0] = seqNum;
   fr.payload.data[1] = 24;
   seqNum++;
 
   #ifdef DEBUG
-    printf("Now sending...");
+    printf("Now sending...\n");
   #endif
   
-  // Now, continue listening
-  radio.startListening();
+  // First, stop listening so we can talk.
+  radio.stopListening();
   
   // Send the payload
   bool ok = radio.write( &fr, sizeof(fr) );
+  
+  
+  // Wait here until we get a response, or timeout (250ms)
+  unsigned long started_waiting_at = millis();
+  bool timeout = false;
+  while ( ! radio.available() && ! timeout )
+  if (millis() - started_waiting_at > 250 )
+  timeout = true;
+
+  // Describe the results
+  if ( timeout )
+  {
+    printf("Failed, response timed out.\n\r");
+  }
+  
   
   // turn off the radio and go to sleep
   radio.powerDown();
@@ -183,8 +206,15 @@ void do_sleep(void)
 {
   set_sleep_mode(SLEEP_MODE_PWR_DOWN); // sleep mode is set here
   sleep_enable();
+  
+  keep_ADCSRA  = ADCSRA;
+  // disable ADC
+  ADCSRA = 0;
 
   sleep_mode();                // System sleeps here
 
+  // enable ADC
+  ADCSRA = keep_ADCSRA;
+  
   sleep_disable();  // System continues execution here when watchdog timed out
 }
