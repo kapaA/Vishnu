@@ -19,6 +19,7 @@
 **                   INCLUDE STATEMENTS
 ** =============================================================================
 */
+#include "DHT.h"
 #include <SPI.h>
 #include <avr/sleep.h>
 #include <avr/power.h>
@@ -31,14 +32,18 @@
 **                   DEFINES
 ** =============================================================================
 */
+
 #define DEBUG
 
+#define DHTPIN 3
+#define DHTTYPE DHT21   // DHT 21 (AM2301)
 
 /*
 ** =============================================================================
 **                   LOCAL VARIABELS  
 ** =============================================================================
 */
+
 RF24 radio(9,10);
 
 // Radio pipe addresses for the 2 nodes to communicate.
@@ -55,6 +60,8 @@ volatile short sleep_cycles_remaining = sleep_cycles_per_transmission;
 // store the state of register ADCSRA
 byte keep_ADCSRA;
 
+// Initialize DHT sensor for normal 16mhz Arduino
+DHT dht(DHTPIN, DHTTYPE);
 
 /*
 ** =============================================================================
@@ -82,6 +89,8 @@ void setup()
   //Start Serial communication
   Serial.begin(57600);
   delay(20);
+  //Start the DHT sensor
+  dht.begin();
   //Printf helper function
   printf_begin();
   delay(1000);
@@ -119,15 +128,24 @@ void loop()
   // Data frame
   VDFrame fr;
   
+  float t = dht.readTemperature();
+  float h = dht.readHumidity();
+  
   fr.header.destAddr = BS_MAC_ID;
   fr.header.srcAddr  = 0x03;//config.mac_addr;
   fr.header.type     = 1;
-  fr.payload.data[0] = seqNum;
-  fr.payload.data[1] = 24;
+  fr.payload.data[0] = (uint8_t) h ;
+  fr.payload.data[1] = (uint8_t) t ;
   seqNum++;
 
   #ifdef DEBUG
     printf("Now sending...\n");
+    Serial.print("Humidity: ");
+    Serial.print(fr.payload.data[0]);
+    Serial.print(" %\t");
+    Serial.print("Temperature: ");
+    Serial.print(fr.payload.data[1]);
+    Serial.println(" *C ");
   #endif
   
   // First, stop listening so we can talk.
