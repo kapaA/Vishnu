@@ -35,8 +35,8 @@
 
 #define DEBUG
 
-#define DHTPIN 3
-#define DHTTYPE DHT21   // DHT 21 (AM2301)
+#define DHTPIN A2
+#define DHTTYPE DHT22   // DHT 21 (AM2301)
 
 /*
 ** =============================================================================
@@ -60,8 +60,8 @@ volatile short sleep_cycles_remaining = sleep_cycles_per_transmission;
 // store the state of register ADCSRA
 byte keep_ADCSRA;
 
-// Initialize DHT sensor for normal 16mhz Arduino
-DHT dht(DHTPIN, DHTTYPE);
+// Initialize DHT sensor for internal 8mhz Arduino
+DHT dht(DHTPIN, DHTTYPE, 3);
 
 /*
 ** =============================================================================
@@ -113,6 +113,9 @@ void setup()
   #ifdef DEBUG
     radio.printDetails();
   #endif
+  
+  //pinMode(7, OUTPUT);
+  
 }
 
 
@@ -128,11 +131,16 @@ void loop()
   // Data frame
   VDFrame fr;
   
+ // digitalWrite(7, HIGH); 
+  //delay(210);
+  
   float t = dht.readTemperature();
   float h = dht.readHumidity();
   
+  //digitalWrite(7, LOW); 
+  
   fr.header.destAddr = BS_MAC_ID;
-  fr.header.srcAddr  = 0x03;//config.mac_addr;
+  fr.header.srcAddr  = 0x07;//config.mac_addr;
   fr.header.type     = 1;
   fr.payload.data[0] = (uint8_t) h ;
   fr.payload.data[1] = (uint8_t) t ;
