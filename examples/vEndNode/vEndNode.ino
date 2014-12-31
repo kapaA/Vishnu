@@ -33,7 +33,8 @@
 ** =============================================================================
 */
 
-#define DEBUG
+// #define DEBUG
+ #define DHT_SENSOR 
 
 #define DHTPIN A2
 #define DHTTYPE DHT22   // DHT 21 (AM2301)
@@ -54,14 +55,17 @@ role_e role;
 
 unsigned long seqNum = 0;
 
-const short sleep_cycles_per_transmission = 2;
+const short sleep_cycles_per_transmission = 60; 
 volatile short sleep_cycles_remaining = sleep_cycles_per_transmission;
 
 // store the state of register ADCSRA
 byte keep_ADCSRA;
 
-// Initialize DHT sensor for internal 8mhz Arduino
-DHT dht(DHTPIN, DHTTYPE, 3);
+#ifdef DHT_SENSOR
+  // Initialize DHT sensor for internal 8mhz Arduino
+  DHT dht(DHTPIN, DHTTYPE, 3);
+#endif 
+
 
 /*
 ** =============================================================================
@@ -86,24 +90,30 @@ void setup()
   MCUCR = bit (BODS) | bit (BODSE);
   MCUCR = bit (BODS);
   
-  //Start Serial communication
-  Serial.begin(57600);
-  delay(20);
-  //Start the DHT sensor
-  dht.begin();
-  //Printf helper function
-  printf_begin();
-  delay(1000);
+  #ifdef DEBUG
+    //Start Serial communication
+    Serial.begin(57600);
+    delay(20);
+    //Printf helper function
+    printf_begin();
+    delay(1000);
+  #endif
+  
+  #ifdef DHT_SENSOR
+    //Start the DHT sensor
+    dht.begin();
+  #endif
+  
   
   //Setup watchdog to interrupt every 1 sec.
-  setup_watchdog(wdt_1s);
+  setup_watchdog(wdt_8s);
   
   // Start the transceiver   
   radio.begin();
   // set the delay between retries & # of retries
   radio.setRetries(15,15);
-  // fixed payload size of 5 bytes
-  radio.setPayloadSize(5);
+  // fixed payload size of 9 bytes
+  radio.setPayloadSize(9);
   //Open read/write pipelines
   radio.openWritingPipe(pipes[0]);
   radio.openReadingPipe(1,pipes[1]);
@@ -128,23 +138,29 @@ void setup()
 ==============================================================================*/
 void loop()
 {
+  seqNum++;
+  
   // Data frame
   VDFrame fr;
+  
+  float t = 0, h = 0;
   
  // digitalWrite(7, HIGH); 
   //delay(210);
   
-  float t = dht.readTemperature();
-  float h = dht.readHumidity();
+  #ifdef DHT_SENSOR
+    t = dht.readTemperature();
+    h = dht.readHumidity();
+  #endif
   
   //digitalWrite(7, LOW); 
   
   fr.header.destAddr = BS_MAC_ID;
-  fr.header.srcAddr  = 0x07;//config.mac_addr;
+  fr.header.srcAddr  = 0x03;//config.mac_addr;
   fr.header.type     = 1;
   fr.payload.data[0] = (uint8_t) h ;
   fr.payload.data[1] = (uint8_t) t ;
-  seqNum++;
+  fr.payload.seqNum = seqNum;
 
   #ifdef DEBUG
     printf("Now sending...\n");
@@ -162,26 +178,12 @@ void loop()
   // Send the payload
   bool ok = radio.write( &fr, sizeof(fr) );
   
-  
-  // Wait here until we get a response, or timeout (250ms)
-  unsigned long started_waiting_at = millis();
-  bool timeout = false;
-  while ( ! radio.available() && ! timeout )
-  if (millis() - started_waiting_at > 250 )
-  timeout = true;
 
-  // Describe the results
-  if ( timeout )
-  {
-    printf("Failed, response timed out.\n\r");
-  }
-  
-  
   // turn off the radio and go to sleep
   radio.powerDown();
   while( sleep_cycles_remaining )
     do_sleep();
-  sleep_cycles_remaining = sleep_cycles_per_transmission;
+    sleep_cycles_remaining = sleep_cycles_per_transmission;
 }
 
 

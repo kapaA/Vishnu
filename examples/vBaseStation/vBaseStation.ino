@@ -14,28 +14,20 @@ role_e role;
 void setup()
 {
   role = role_base_station;
-
   Serial.begin(57600);
   delay(20);
   printf_begin();
   delay(1000);
-
   radio.begin();
-  
   // optionally, increase the delay between retries & # of retries
-  radio.setRetries(15,15);
-
+  radio.setRetries(15,1);
   // optionally, reduce the payload size.  seems to
   // improve reliability
-  radio.setPayloadSize(5);
-
+  radio.setPayloadSize(9);
   // Open the pipe for reading/writing
-  
   radio.openWritingPipe(pipes[1]);
   radio.openReadingPipe(1,pipes[0]);
-  
   radio.startListening();
-
   // Dump the configuration of the rf unit for debugging
   radio.printDetails();
 }
@@ -45,9 +37,7 @@ void loop(void)
   // if there is data ready
   if ( radio.available() )
   {
-    
-    VDFrame frRx, frTx;
-    
+    VDFrame frRx;
     // Dump the payloads until we've gotten everything
     unsigned long got_time;
     bool done = false;
@@ -55,28 +45,9 @@ void loop(void)
     {
       // Fetch the payload, and see if this was the last one.
       done = radio.read( &frRx, sizeof(frRx) );
-
       // Spew it.  Include our time, because the ping_out millis counter is unreliable
       // due to it sleeping
-      printf("%d %d %d %d\n", frRx.header.srcAddr, frRx.header.type, frRx.payload.data[0], frRx.payload.data[1] );
+      printf("%d %d %d %d %lu\n", frRx.header.srcAddr, frRx.header.type, frRx.payload.data[0], frRx.payload.data[1], frRx.payload.seqNum);
     }
-    
-    
-    // First, stop listening so we can talk
-    radio.stopListening();
-    
-    
-    frTx.header.destAddr = frRx.header.srcAddr;
-    frTx.header.srcAddr  = BS_MAC_ID;
-    frTx.header.type     = 1;
-    frTx.payload.data[0] = 00;
-    frTx.payload.data[1] = 00;
-
-    // Send the final one back.
-    radio.write( &frTx, sizeof(frTx) );
-
-    // Now, resume listening so we catch the next packets.
-    radio.startListening();
-    
   }
 }
