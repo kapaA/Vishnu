@@ -37,7 +37,8 @@
  #define DHT_SENSOR 
 
 #define DHTPIN A2
-#define DHTTYPE DHT22   // DHT 21 (AM2301)
+#define DHTTYPE DHT11   // DHT 11
+//#define DHTTYPE DHT21   // DHT 21 (AM2301)
 
 /*
 ** =============================================================================
@@ -55,7 +56,7 @@ role_e role;
 
 unsigned long seqNum = 0;
 
-const short sleep_cycles_per_transmission = 60; 
+const short sleep_cycles_per_transmission = 1; 
 volatile short sleep_cycles_remaining = sleep_cycles_per_transmission;
 
 // store the state of register ADCSRA
@@ -106,7 +107,7 @@ void setup()
   
   
   //Setup watchdog to interrupt every 1 sec.
-  setup_watchdog(wdt_8s);
+  setup_watchdog(wdt_1s);
   
   // Start the transceiver   
   radio.begin();
@@ -149,6 +150,8 @@ void loop()
   //delay(210);
   
   #ifdef DHT_SENSOR
+    dht.begin();
+    delay(300);
     t = dht.readTemperature();
     h = dht.readHumidity();
   #endif
@@ -156,7 +159,7 @@ void loop()
   //digitalWrite(7, LOW); 
   
   fr.header.destAddr = BS_MAC_ID;
-  fr.header.srcAddr  = 0x03;//config.mac_addr;
+  fr.header.srcAddr  = 0x04;//config.mac_addr;
   fr.header.type     = 1;
   fr.payload.data[0] = (uint8_t) h ;
   fr.payload.data[1] = (uint8_t) t ;
