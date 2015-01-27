@@ -33,8 +33,8 @@
 ** =============================================================================
 */
 
-// #define DEBUG
- #define DHT_SENSOR 
+ #define DEBUG
+// #define DHT_SENSOR 
 
 #define DHTPIN A2
 #define DHTTYPE DHT11   // DHT 11
