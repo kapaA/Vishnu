@@ -33,11 +33,11 @@
 ** =============================================================================
 */
 
-// #define DEBUG
- #define DHT_SENSOR 
+ #define DEBUG
+ //#define DHT_SENSOR 
 
 #define DHTPIN A2
-#define DHTTYPE DHT11   // DHT 11
+//#define DHTTYPE DHT11   // DHT 11
 //#define DHTTYPE DHT21   // DHT 21 (AM2301)
 
 /*
@@ -172,11 +172,11 @@ void loop()
     Serial.print(" %\t");
     Serial.print("Temperature: ");
     Serial.print(fr.payload.data[1]);
-    Serial.println(" *C ");
+    Serial.print(" *C ");
+    Serial.print("Cnt ");
+    Serial.print(fr.payload.seqNum);
+    Serial.println("  ");
   #endif
-  
-  // First, stop listening so we can talk.
-  radio.stopListening();
   
   // Send the payload
   bool ok = radio.write( &fr, sizeof(fr) );
@@ -187,6 +187,7 @@ void loop()
   while( sleep_cycles_remaining )
     do_sleep();
     sleep_cycles_remaining = sleep_cycles_per_transmission;
+  radio.powerUp();
 }
 
 
@@ -235,6 +236,9 @@ ISR(WDT_vect)
 ==============================================================================*/
 void do_sleep(void)
 {
+  #ifdef DEBUG
+    printf("Now sleeping...\n");
+  #endif
   set_sleep_mode(SLEEP_MODE_PWR_DOWN); // sleep mode is set here
   sleep_enable();
   
