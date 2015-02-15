@@ -11,11 +11,3 @@
 
 
 
-
-void systemConfig(void);
-void readEeprom(void);
-void writeEeprom(uint8_t add, uint8_t data);
-
-GLOB_RET network_interface(char iKey, pload *d);
-
-

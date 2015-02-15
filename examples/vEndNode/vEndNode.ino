@@ -125,8 +125,11 @@ void setup()
   #ifdef DEBUG
     radio.printDetails();
   #endif
-  
-  //pinMode(7, OUTPUT);
+
+  //LED pin configuration  
+  pinMode(GREEN, OUTPUT);
+  pinMode(YELLOW, OUTPUT);
+  pinMode(RED, OUTPUT);
   
 }
 
@@ -180,6 +183,9 @@ void loop()
   #endif
   
   // Send the payload
+  digitalWrite(GREEN, !digitalRead(GREEN));
+  digitalWrite(YELLOW, !digitalRead(YELLOW));
+  digitalWrite(RED, !digitalRead(RED));
   bool ok = radio.write( &fr, sizeof(fr) );
   
 

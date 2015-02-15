@@ -86,6 +86,11 @@ typedef enum { role_end_node = 1, role_base_station  } role_e;
 
 //Interface iKey
 #define INCOMING 0
-#define OUTGOING 1
+#define OUTGOING 
+
+// LEDs
+#define GREEN  4
+#define YELLOW 5
+#define RED    6
 
 #endif
