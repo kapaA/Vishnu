@@ -34,7 +34,7 @@
 */
 
  #define DEBUG
-
+ #define SLEEP_MODE
 // #define DHT_SENSOR 
 
 #define DHTPIN A2
@@ -47,13 +47,12 @@
 ** =============================================================================
 */
 
+
+
 RF24 radio(9,10);
 
 // Radio pipe addresses for the 2 nodes to communicate.
 const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
-
-// The role of the current running sketch
-role_e role;
 
 unsigned long seqNum = 0;
 
@@ -69,6 +68,8 @@ byte keep_ADCSRA;
 #endif 
 
 
+
+
 /*
 ** =============================================================================
 **                   LOCAL EXPORTED FUNCTION DECLARATIONS
@@ -76,7 +77,7 @@ byte keep_ADCSRA;
 */
 void setup_watchdog(uint8_t prescalar);
 void do_sleep(void);
-
+int sendPayload(VDFrame fr);
 
 /*==============================================================================
 ** Function...: setup
@@ -112,6 +113,8 @@ void setup()
   
   // Start the transceiver   
   radio.begin();
+  // Set the channel 
+  radio.setChannel(90);
   // set the delay between retries & # of retries
   radio.setRetries(15,15);
   // fixed payload size of 9 bytes
@@ -131,6 +134,8 @@ void setup()
   pinMode(YELLOW, OUTPUT);
   pinMode(RED, OUTPUT);
   
+  
+  
 }
 
 
@@ -143,6 +148,8 @@ void setup()
 ==============================================================================*/
 void loop()
 {
+  
+  
   seqNum++;
   
   // Data frame
@@ -150,9 +157,7 @@ void loop()
   
   float t = 0, h = 0;
   
- // digitalWrite(7, HIGH); 
-  //delay(210);
-  
+
   #ifdef DHT_SENSOR
     dht.begin();
     delay(300);
@@ -163,39 +168,59 @@ void loop()
   //digitalWrite(7, LOW); 
   
   fr.header.destAddr = BS_MAC_ID;
-  fr.header.srcAddr  = 0x04;//config.mac_addr;
-  fr.header.type     = 1;
+  fr.header.srcAddr  = 14;//config.mac_addr;
+  fr.header.type     = 2;
   fr.payload.data[0] = (uint8_t) h ;
   fr.payload.data[1] = (uint8_t) t ;
   fr.payload.seqNum = seqNum;
 
   #ifdef DEBUG
-    printf("Now sending...\n");
-    Serial.print("Humidity: ");
-    Serial.print(fr.payload.data[0]);
-    Serial.print(" %\t");
-    Serial.print("Temperature: ");
-    Serial.print(fr.payload.data[1]);
-    Serial.print(" *C ");
-    Serial.print("Cnt ");
-    Serial.print(fr.payload.seqNum);
-    Serial.println("  ");
+    printf("Now sending...");
   #endif
   
   // Send the payload
-  digitalWrite(GREEN, !digitalRead(GREEN));
-  digitalWrite(YELLOW, !digitalRead(YELLOW));
-  digitalWrite(RED, !digitalRead(RED));
-  bool ok = radio.write( &fr, sizeof(fr) );
+  sendPayload(fr);
   
+  
+  
+  
+  
+  #ifdef SLEEP_MODE
+    // turn off the radio and go to sleep
+    radio.powerDown();
+    while( sleep_cycles_remaining )
+      do_sleep();
+      sleep_cycles_remaining = sleep_cycles_per_transmission;
+    radio.powerUp();
+  #endif
+} 
 
-  // turn off the radio and go to sleep
-  radio.powerDown();
-  while( sleep_cycles_remaining )
-    do_sleep();
-    sleep_cycles_remaining = sleep_cycles_per_transmission;
-  radio.powerUp();
+int sendPayload(VDFrame fr)
+{
+  
+  bool ok;
+  radio.startListening();
+  while(radio.testCarrier()) digitalWrite(YELLOW, HIGH);
+  digitalWrite(YELLOW, LOW);
+    
+  radio.stopListening();
+  delayMicroseconds(128);
+  ok = radio.write( &fr, sizeof(fr) );
+  
+  if(ok)
+  {
+    digitalWrite(GREEN, !digitalRead(GREEN));
+  } 
+  else
+  {
+    digitalWrite(RED, !digitalRead(RED));
+  }
+  
+   printf(" %d\n", ok);
+   
 }
+
+
 
 
 /*==============================================================================
@@ -243,9 +268,7 @@ ISR(WDT_vect)
 ==============================================================================*/
 void do_sleep(void)
 {
-  #ifdef DEBUG
-    printf("Now sleeping...\n");
-  #endif
+
   set_sleep_mode(SLEEP_MODE_PWR_DOWN); // sleep mode is set here
   sleep_enable();
   
