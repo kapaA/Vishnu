@@ -162,7 +162,6 @@ void loop()
   fr.payload.data[1] = (uint8_t) t ;
   fr.payload.seqNum = seqNum;
 
-  
   // Send the payload
   sendPayload(fr);
 
