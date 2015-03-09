@@ -30,6 +30,7 @@ typedef enum { wdt_16ms = 0, wdt_32ms, wdt_64ms, wdt_128ms, wdt_250ms, wdt_500ms
  * Size: 28 bytes
 */
 typedef struct{
+  
   uint8_t data[2];         // 2 bytes
   unsigned long seqNum;      // 4
 }  pload;  

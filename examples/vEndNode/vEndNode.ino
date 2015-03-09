@@ -1,24 +1,20 @@
 /*  ============================================================================
-    Copyright (C) 2014 - 2016 Achuthan
-    All rights reserved.
+    Copyright (C) 2015 Achuthan Paramanathan.
+    RF24 lib. provided by 2011 J. Coliz <maniacbug@ymail.com>
     ============================================================================
-    This document contains proprietary information belonging to Achuthan.
-    Passing on and copying of this document, use and
-    communication of its contents is not permitted without prior written
-    authorization.
+    This program is free software; you can redistribute it and/or
+    modify it under the terms of the GNU General Public License
+    version 2 as published by the Free Software Foundation.
     ============================================================================
     Revision Information:
-        File name: vEndNode.ino
-        Version:   v0.1
-        Date:      2014-11-28
-    ============================================================================
-*/
+        File name: node.ino
+        Version:   v0.0
+        Date:      04-03-2015
+    ==========================================================================*/
 
-/*
-** =============================================================================
-**                   INCLUDE STATEMENTS
-** =============================================================================
-*/
+/*============================================================================*/
+/*                           INCLUDE STATEMENTS                               */
+/*============================================================================*/
 #include "DHT.h"
 #include <SPI.h>
 #include <avr/sleep.h>
@@ -27,57 +23,59 @@
 #include "commonInterface.h"
 
 
-/*
-** =============================================================================
-**                   DEFINES
-** =============================================================================
-*/
-
- #define DEBUG
+/*============================================================================*/
+/*                           PRIVATE DIFINES                                  */
+/*============================================================================*/
+ //#define DEBUG
+ //#define LED_DEBUG
  #define SLEEP_MODE
-// #define DHT_SENSOR 
+ #define DHT_SENSOR 
 
 #define DHTPIN A2
-//#define DHTTYPE DHT11   // DHT 11
+#define DHTTYPE DHT11   // DHT 11
 //#define DHTTYPE DHT21   // DHT 21 (AM2301)
 
-/*
-** =============================================================================
-**                   LOCAL VARIABELS  
-** =============================================================================
-*/
 
-
-
+/*============================================================================*/
+/*                           Hardware configuration                           */
+/*============================================================================*/
 RF24 radio(9,10);
 
 // Radio pipe addresses for the 2 nodes to communicate.
 const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
 
-unsigned long seqNum = 0;
-
-const short sleep_cycles_per_transmission = 1; 
-volatile short sleep_cycles_remaining = sleep_cycles_per_transmission;
-
 // store the state of register ADCSRA
 byte keep_ADCSRA;
 
 #ifdef DHT_SENSOR
-  // Initialize DHT sensor for internal 8mhz Arduino
-  DHT dht(DHTPIN, DHTTYPE, 3);
-#endif 
+// Initialize DHT sensor for internal 8mhz Arduino
+DHT dht(DHTPIN, DHTTYPE, 3);
+#endif
 
 
+/*============================================================================*/
+/*                           LOCAL VARIABLES                                  */
+/*============================================================================*/
+unsigned long seqNum = 0;
 
+const short sleep_cycles_per_transmission = 1;
+volatile short sleep_cycles_remaining = sleep_cycles_per_transmission;
 
-/*
-** =============================================================================
-**                   LOCAL EXPORTED FUNCTION DECLARATIONS
-** =============================================================================
-*/
+struct statistics
+{
+  uint16_t failed_tx;
+  uint16_t successful_tx;
+};
+
+statistics stats;
+
+/*============================================================================*/
+/*                   LOCAL EXPORTED FUNCTION DECLARATIONS                     */
+/*============================================================================*/
 void setup_watchdog(uint8_t prescalar);
 void do_sleep(void);
 int sendPayload(VDFrame fr);
+
 
 /*==============================================================================
 ** Function...: setup
@@ -88,7 +86,6 @@ int sendPayload(VDFrame fr);
 ==============================================================================*/
 void setup()
 {
-  
   // turn off brown-out enable in software
   MCUCR = bit (BODS) | bit (BODSE);
   MCUCR = bit (BODS);
@@ -107,10 +104,8 @@ void setup()
     dht.begin();
   #endif
   
-  
   //Setup watchdog to interrupt every 1 sec.
   setup_watchdog(wdt_1s);
-  
   // Start the transceiver   
   radio.begin();
   // Set the channel 
@@ -129,13 +124,12 @@ void setup()
     radio.printDetails();
   #endif
 
-  //LED pin configuration  
-  pinMode(GREEN, OUTPUT);
-  pinMode(YELLOW, OUTPUT);
-  pinMode(RED, OUTPUT);
-  
-  
-  
+  #ifdef LED_DEBUG
+    //LED pin configuration  
+    pinMode(GREEN, OUTPUT);
+    pinMode(YELLOW, OUTPUT);
+    pinMode(RED, OUTPUT);
+  #endif
 }
 
 
@@ -148,15 +142,11 @@ void setup()
 ==============================================================================*/
 void loop()
 {
-  
-  
-  seqNum++;
-  
+  float t = 0, h = 0;
   // Data frame
   VDFrame fr;
   
-  float t = 0, h = 0;
-  
+  seqNum++;
 
   #ifdef DHT_SENSOR
     dht.begin();
@@ -165,26 +155,17 @@ void loop()
     h = dht.readHumidity();
   #endif
   
-  //digitalWrite(7, LOW); 
-  
   fr.header.destAddr = BS_MAC_ID;
-  fr.header.srcAddr  = 14;//config.mac_addr;
+  fr.header.srcAddr  = 16;
   fr.header.type     = 2;
   fr.payload.data[0] = (uint8_t) h ;
   fr.payload.data[1] = (uint8_t) t ;
   fr.payload.seqNum = seqNum;
 
-  #ifdef DEBUG
-    printf("Now sending...");
-  #endif
   
   // Send the payload
   sendPayload(fr);
-  
-  
-  
-  
-  
+
   #ifdef SLEEP_MODE
     // turn off the radio and go to sleep
     radio.powerDown();
@@ -195,32 +176,51 @@ void loop()
   #endif
 } 
 
+
+/*==============================================================================
+** Function...: sendPayload
+** Return.....: void
+** Description: main function
+** Created....: 28.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
 int sendPayload(VDFrame fr)
 {
-  
   bool ok;
+  
   radio.startListening();
-  while(radio.testCarrier()) digitalWrite(YELLOW, HIGH);
-  digitalWrite(YELLOW, LOW);
-    
-  radio.stopListening();
   delayMicroseconds(128);
+  radio.stopListening();
+  while(radio.testCarrier())
+  {
+     #ifdef LED_DEBUG
+      digitalWrite(YELLOW, HIGH);
+     #endif
+     radio.startListening();
+     delayMicroseconds(128); // # 128uS at least to detect any carrier 
+     radio.stopListening();
+  }   
+  #ifdef LED_DEBUG  
+    digitalWrite(YELLOW, LOW);
+  #endif  
+  
+  
   ok = radio.write( &fr, sizeof(fr) );
   
   if(ok)
   {
-    digitalWrite(GREEN, !digitalRead(GREEN));
+    #ifdef LED_DEBUG  
+      digitalWrite(GREEN, !digitalRead(GREEN));
+    #endif
+    stats.successful_tx++;
   } 
   else
   {
     digitalWrite(RED, !digitalRead(RED));
+    stats.failed_tx++;
   }
-  
-   printf(" %d\n", ok);
    
 }
-
-
 
 
 /*==============================================================================
@@ -268,7 +268,6 @@ ISR(WDT_vect)
 ==============================================================================*/
 void do_sleep(void)
 {
-
   set_sleep_mode(SLEEP_MODE_PWR_DOWN); // sleep mode is set here
   sleep_enable();
   
