@@ -17,6 +17,8 @@
 #ifndef __COMON_VAR_H__
 #define __COMON_VAR_H__
 
+#define BUFFER_SIZE 40
+
 #ifndef ARDUINO
 typedef unsigned __int8 uint8_t;
 typedef unsigned __int32 uint32_t;
@@ -27,22 +29,21 @@ typedef enum { wdt_16ms = 0, wdt_32ms, wdt_64ms, wdt_128ms, wdt_250ms, wdt_500ms
 
 /**
  * Typedef struct containing the payload structure
- * Size: 28 bytes
+ * Size: 6 bytes
 */
 typedef struct{
-  
-  uint8_t data[2];         // 2 bytes
-  unsigned long seqNum;      // 4
+  uint8_t data[2];        // 2 bytes
+  unsigned long seqNum;    // 4 bytes
 }  pload;  
 
 /**
  * Typedef struct containing the header structure
- * Size: 2 bytes
+ * Size: 3 bytes
 */
 typedef struct{
-  uint8_t  type    :4;    // 4 bits
-  uint8_t srcAddr  :6;    // 6 bits
-  uint8_t destAddr :6;    // 6 bits
+  uint8_t  type;    // 8 bits
+  uint8_t srcAddr;    // 8 bits
+  uint8_t destAddr;    // 8 bits
 }  head;  
   
 /**
@@ -67,6 +68,16 @@ typedef struct
   uint8_t mac_addr;
 } configuration;
 
+
+typedef struct
+{
+  unsigned volatile int read_pointer;
+  unsigned volatile int write_pointer;
+  unsigned volatile int data_size;
+  VDFrame buffer[BUFFER_SIZE];
+}bufPar;
+
+
 /*
 ** ==========================================================================
 **                       Extern Global variables
@@ -76,6 +87,8 @@ typedef struct
 
 extern configuration config;
 
+extern bufPar outBufPar;
+extern bufPar inBufPar;
 
 #endif
 

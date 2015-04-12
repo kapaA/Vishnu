@@ -7,76 +7,73 @@
     version 2 as published by the Free Software Foundation.
     ============================================================================
     Revision Information:
-        File name: node.ino
+        File name: vNeuron.ino
         Version:   v0.0
         Date:      04-03-2015
     ==========================================================================*/
 
+
 /*============================================================================*/
 /*                           INCLUDE STATEMENTS                               */
 /*============================================================================*/
-#include "DHT.h"
+
 #include <SPI.h>
-#include <avr/sleep.h>
-#include <avr/power.h>
+#include <commonInterface.h>
+
+#include "SimpleTimer.h"
+#include "ringBuffer.h"
 #include "printf.h"
-#include "commonInterface.h"
 
 
 /*============================================================================*/
 /*                           PRIVATE DIFINES                                  */
 /*============================================================================*/
- #define DEBUG
- #define LED_DEBUG
- #define SLEEP_MODE
- #define DHT_SENSOR 
 
-#define DHTPIN A2
-#define DHTTYPE DHT11   // DHT 11
-//#define DHTTYPE DHT21   // DHT 21 (AM2301)
+#define NPS_INTERVAL 1000 // Neuron Pulse Signal Interval
 
 
 /*============================================================================*/
 /*                           Hardware configuration                           */
 /*============================================================================*/
+// Set up nRF24L01 radio on SPI bus plus pins 9 & 10
 RF24 radio(9,10);
 
 // Radio pipe addresses for the 2 nodes to communicate.
 const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
 
-// store the state of register ADCSRA
-byte keep_ADCSRA;
-
-#ifdef DHT_SENSOR
-// Initialize DHT sensor for internal 8mhz Arduino
-DHT dht(DHTPIN, DHTTYPE, 3);
-#endif
-
 
 /*============================================================================*/
 /*                           LOCAL VARIABLES                                  */
 /*============================================================================*/
-unsigned long seqNum = 0;
 
-const short sleep_cycles_per_transmission = 1;
-volatile short sleep_cycles_remaining = sleep_cycles_per_transmission;
+uint8_t src_macID  = 1;
+uint8_t dest_macID = 2;
+
+SimpleTimer npsTimer; // The Neuron Pulse Signal timer
+
+uint16_t frameDubManager[100];
+
+bufPar outBufPar;
+bufPar inBufPar;
+
+unsigned long seqNum = 0;
 
 struct statistics
 {
-  uint16_t failed_tx;
-  uint16_t successful_tx;
+  uint8_t failed_tx;
+  uint8_t successful_tx;
+  
+  uint8_t carrier_sensed;
+  
+  uint8_t total_tx;
+  uint8_t total_rx;
+  
+  uint8_t fromNode[40];
+  
+  uint8_t macCDCnt;
 };
 
 statistics stats;
-
-int battVolts; 
-
-/*============================================================================*/
-/*                   LOCAL EXPORTED FUNCTION DECLARATIONS                     */
-/*============================================================================*/
-void setup_watchdog(uint8_t prescalar);
-void do_sleep(void);
-int sendPayload(VDFrame fr);
 
 
 /*==============================================================================
@@ -88,52 +85,32 @@ int sendPayload(VDFrame fr);
 ==============================================================================*/
 void setup()
 {
-  // turn off brown-out enable in software
-  MCUCR = bit (BODS) | bit (BODSE);
-  MCUCR = bit (BODS);
+  Serial.begin(115200);
+  delay(20);
+  printf_begin();
+  delay(1000);
   
-  #ifdef DEBUG
-    //Start Serial communication
-    Serial.begin(57600);
-    delay(20);
-    //Printf helper function
-    printf_begin();
-    delay(1000);
-  #endif
-  
-  #ifdef DHT_SENSOR
-    //Start the DHT sensor
-    dht.begin();
-  #endif
-  
-  //Setup watchdog to interrupt every 1 sec.
-  setup_watchdog(wdt_1s);
-  // Start the transceiver   
   radio.begin();
-  radio.setPALevel(RF24_PA_MAX);
-  // Set the channel 
-  radio.setChannel(90);
-  // set the delay between retries & # of retries
-  radio.setRetries(15,15);
-  // fixed payload size of 9 bytes
+  // Set the channel
+  radio.setChannel(9);
+  // optionally, increase the delay between retries & # of retries
+  radio.setRetries(15,1);
+  // optionally, reduce the payload size.  seems to
+  // improve reliability
   radio.setPayloadSize(9);
-  //Open read/write pipelines
-  radio.openWritingPipe(pipes[0]);
-  radio.openReadingPipe(1,pipes[1]);
-  //Start the listening
+  // Open the pipe for reading/writing
+  radio.openWritingPipe(pipes[1]);
+  radio.openReadingPipe(1,pipes[0]);
   radio.startListening();
-
-  #ifdef DEBUG
-    radio.printDetails();
-  #endif
-
-  #ifdef LED_DEBUG
-    //LED pin configuration  
-    pinMode(GREEN, OUTPUT);
-    pinMode(YELLOW, OUTPUT);
-    pinMode(RED, OUTPUT);
-  #endif
+  // Dump the configuration of the rf unit for debugging
+  radio.printDetails();
+  
+  // the function is called every routine time interval
+  npsTimer.setInterval(NPS_INTERVAL, neuronPulsGenerator);
+  
+  attachInterrupt(0, check_radio, FALLING);
 }
+
 
 
 /*==============================================================================
@@ -143,52 +120,23 @@ void setup()
 ** Created....: 28.11.2014 by Achuthan
 ** Modified...: dd.mm.yyyy by nn
 ==============================================================================*/
-void loop()
+void loop(void)
 {
-  float t = 0, h = 0;
-  // Data frame
-  VDFrame fr; 
+  VDFrame frRx;
+  npsTimer.run();
   
-  seqNum++;
-  
-  
-  
-  battVolts=getBandgap();  //Determins what actual Vcc is, (X 100), based on known bandgap voltage
-  
-
-
-  #ifdef DHT_SENSOR
-    dht.begin();
-    delay(300);
-    t = dht.readTemperature();
-    h = dht.readHumidity();
-  #endif
-  
-  fr.header.destAddr = BS_MAC_ID;
-  fr.header.srcAddr  = 19;
-  fr.header.type     = 6;
-  fr.payload.data[0] = battVolts/10;
-  fr.payload.data[1] = (uint8_t) t;
-  fr.payload.seqNum = seqNum;
-
-  // Send the payload
-  sendPayload(fr);
-
-  #ifdef SLEEP_MODE
-    // turn off the radio and go to sleep
-    radio.powerDown();
-    while( sleep_cycles_remaining )
-      do_sleep();
-      sleep_cycles_remaining = sleep_cycles_per_transmission;
-    radio.powerUp();
-  #endif
-} 
+  if (!buffer_empty(&inBufPar))
+  {
+    read_buffer(&frRx, &inBufPar);
+    //printf("R: %d %d %d\n",inBufPar.read_pointer, inBufPar.write_pointer, inBufPar.data_size);
+  }
+}
 
 
 /*==============================================================================
 ** Function...: sendPayload
 ** Return.....: void
-** Description: main function
+** Description: Send out a frame using LBT
 ** Created....: 28.11.2014 by Achuthan
 ** Modified...: dd.mm.yyyy by nn
 ==============================================================================*/
@@ -201,96 +149,168 @@ int sendPayload(VDFrame fr)
   radio.stopListening();
   while(radio.testCarrier())
   {
-     #ifdef LED_DEBUG
-      digitalWrite(YELLOW, HIGH);
-     #endif
-     radio.startListening();
-     delayMicroseconds(128); // # 128uS at least to detect any carrier 
-     radio.stopListening();
-  }   
-  #ifdef LED_DEBUG  
-    digitalWrite(YELLOW, LOW);
-  #endif  
+    #ifdef LED_DEBUG
+    digitalWrite(YELLOW, HIGH);
+    #endif
+    radio.startListening();
+    delayMicroseconds(128); // # 128uS at least to detect any carrier
+    radio.stopListening();
+    
+    stats.carrier_sensed++;
+  }
+  #ifdef LED_DEBUG
+  digitalWrite(YELLOW, LOW);
+  #endif
   
+  stats.total_tx++;
   
   ok = radio.write( &fr, sizeof(fr) );
   
   if(ok)
   {
-    #ifdef LED_DEBUG  
-      digitalWrite(GREEN, !digitalRead(GREEN));
+    #ifdef LED_DEBUG
+    digitalWrite(GREEN, !digitalRead(GREEN));
     #endif
-    stats.successful_tx++;
-  } 
+  }
   else
   {
     digitalWrite(RED, !digitalRead(RED));
-    stats.failed_tx++;
   }
-   
 }
 
 
 /*==============================================================================
-** Function...: setup
+** Function...: neuronPulsGenerator
 ** Return.....: void
-** Description: watchdog  setup. 
-**              Arguments: 
-**              0=16ms, 1=32ms,2=64ms,3=125ms,4=250ms,5=500ms
-**              6=1 sec,7=2 sec, 8=4 sec, 9= 8sec
-** Created....: 28.11.2014 by Achuthan
+** Description: Sends out pulse to the central unit
+** Created....: 18.2.2015 by Achuthan
 ** Modified...: dd.mm.yyyy by nn
 ==============================================================================*/
-void setup_watchdog(uint8_t prescalar)
+void neuronPulsGenerator(void)
 {
-  prescalar = min(9,prescalar);
-  uint8_t wdtcsr = prescalar & 7;
-  if ( prescalar & 8 )
-  wdtcsr |= _BV(WDP3);
-
-  MCUSR &= ~_BV(WDRF);
-  WDTCSR = _BV(WDCE) | _BV(WDE);
-  WDTCSR = _BV(WDCE) | wdtcsr | _BV(WDIE);
-}
-
-
-/*==============================================================================
-** Function...: ISR
-** Return.....: void
-** Description: Watchdog timer interrupt service
-** Created....: 28.11.2014 by Achuthan
-** Modified...: dd.mm.yyyy by nn
-==============================================================================*/
-ISR(WDT_vect)
-{
-  --sleep_cycles_remaining;
-}
-
-
-/*==============================================================================
-** Function...: do_sleep
-** Return.....: void
-** Description: prepare sleep
-** Created....: 28.11.2014 by Achuthan
-** Modified...: dd.mm.yyyy by nn
-==============================================================================*/
-void do_sleep(void)
-{
-  set_sleep_mode(SLEEP_MODE_PWR_DOWN); // sleep mode is set here
-  sleep_enable();
+  VDFrame frTx;
+  char s[100];
+  int battVolts;
   
-  keep_ADCSRA  = ADCSRA;
-  // disable ADC
-  ADCSRA = 0;
-
-  sleep_mode();                // System sleeps here
-
-  // enable ADC
-  ADCSRA = keep_ADCSRA;
+  battVolts=getBandgap();
   
-  sleep_disable();  // System continues execution here when watchdog timed out
+  frTx.header.destAddr = dest_macID;
+  frTx.header.srcAddr  = src_macID;
+  frTx.header.type     = 0;
+  frTx.payload.data[0] = battVolts/10;;
+  frTx.payload.data[1] = stats.carrier_sensed;
+  frTx.payload.seqNum  = seqNum++;
+  
+  detachInterrupt(0);
+  // Send the payload
+  sendPayload(frTx);
+  radio.stopListening();
+  delayMicroseconds(128);
+  radio.startListening();
+  attachInterrupt(0, check_radio, FALLING);
+  
+  
+  
+  // Print outs //
+  
+  sprintf(s," %d %d %d %d| %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+  
+  stats.carrier_sensed, stats.total_tx, stats.total_rx, frTx.payload.data[0],
+  stats.fromNode[1],  stats.fromNode[2],  stats.fromNode[3],  stats.fromNode[4],
+  stats.fromNode[5],  stats.fromNode[6],  stats.fromNode[7],  stats.fromNode[8],
+  stats.fromNode [9], stats.fromNode[10], stats.fromNode[11], stats.fromNode[12],
+  stats.fromNode[13], stats.fromNode[14], stats.fromNode[15], stats.fromNode[16]);
+  
+  
+  Serial.println(s);
+  
+  stats.carrier_sensed = 0;
+  stats.failed_tx = 0;
+  stats.macCDCnt = 0;
+  stats.successful_tx = 0;
+  stats.total_rx = 0;
+  stats.total_tx = 0;
+  
+  stats.fromNode[1] = 0;
+  stats.fromNode[2] = 0;
+  stats.fromNode[3] = 0;
+  stats.fromNode[4] = 0;
+  stats.fromNode[5] = 0;
+  stats.fromNode[6] = 0;
+  stats.fromNode[7] = 0;
+  stats.fromNode[8] = 0;
+  stats.fromNode[9] = 0;
+  stats.fromNode[10] = 0;
+  stats.fromNode[11] = 0;
+  stats.fromNode[12] = 0;
+  stats.fromNode[13] = 0;
+  stats.fromNode[14] = 0;
+  stats.fromNode[15] = 0;
+  stats.fromNode[16] = 0;
+
 }
 
+
+/*==============================================================================
+** Function...: check_radio
+** Return.....: void
+** Description: Interrupt routine handling incomming frames
+** Created....: 28.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
+void check_radio(void)
+{
+  
+  // if there is data ready
+  if ( radio.available() )
+  { 
+    VDFrame frRx;
+    bool done = false;
+    stats.total_rx++;
+    
+    while (!done)
+    { 
+      // Fetch the frame
+      done = radio.read( &frRx, sizeof(frRx) );
+      
+      // Keep some statistic about from whom we get frame from
+      stats.fromNode[frRx.header.srcAddr]++;
+      
+      // Is this frame for me ?
+      if(frRx.header.destAddr == src_macID)
+      {
+        // Is this frame same as the previous frame ?
+        if(frRx.payload.seqNum^frameDubManager[frRx.header.srcAddr])
+        {
+          frameDubManager[frRx.header.srcAddr] = frRx.payload.seqNum;
+          
+          // Is inbuffer full?
+          if (! buffer_full(&inBufPar))
+          {
+            write_buffer(&frRx, &inBufPar);
+            //printf("W: %d %d %d\n",inBufPar.read_pointer, inBufPar.write_pointer, inBufPar.data_size);
+          }
+          else
+          {
+            printf("Buffer full\n");
+          }
+          
+        }
+        
+      }
+      
+    } 
+  } 
+}
+
+
+/*==============================================================================
+** Function...: getBandgap
+** Return.....: int
+** Description: Reads the battery level
+** Created....: 28.11.2014 by Achuthan
+** Modified...: dd.mm.yyyy by nn
+==============================================================================*/
 int getBandgap(void) // Returns actual value of Vcc (x 100)
 {
   
