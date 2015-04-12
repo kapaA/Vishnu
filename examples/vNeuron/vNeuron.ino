@@ -128,7 +128,9 @@ void loop(void)
   if (!buffer_empty(&inBufPar))
   {
     read_buffer(&frRx, &inBufPar);
-    //printf("R: %d %d %d\n",inBufPar.read_pointer, inBufPar.write_pointer, inBufPar.data_size);
+    printf("%d %d %d %lu %d %d\n",
+    frRx.header.srcAddr, frRx.header.destAddr, frRx.header.type,
+    frRx.payload.seqNum, frRx.payload.data[0], frRx.payload.data[1] );
   }
 }
 
@@ -197,7 +199,7 @@ void neuronPulsGenerator(void)
   frTx.header.destAddr = dest_macID;
   frTx.header.srcAddr  = src_macID;
   frTx.header.type     = 0;
-  frTx.payload.data[0] = battVolts/10;;
+  frTx.payload.data[0] = battVolts/10;
   frTx.payload.data[1] = stats.carrier_sensed;
   frTx.payload.seqNum  = seqNum++;
   
@@ -210,44 +212,6 @@ void neuronPulsGenerator(void)
   attachInterrupt(0, check_radio, FALLING);
   
   
-  
-  // Print outs //
-  
-  sprintf(s," %d %d %d %d| %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-  
-  stats.carrier_sensed, stats.total_tx, stats.total_rx, frTx.payload.data[0],
-  stats.fromNode[1],  stats.fromNode[2],  stats.fromNode[3],  stats.fromNode[4],
-  stats.fromNode[5],  stats.fromNode[6],  stats.fromNode[7],  stats.fromNode[8],
-  stats.fromNode [9], stats.fromNode[10], stats.fromNode[11], stats.fromNode[12],
-  stats.fromNode[13], stats.fromNode[14], stats.fromNode[15], stats.fromNode[16]);
-  
-  
-  Serial.println(s);
-  
-  stats.carrier_sensed = 0;
-  stats.failed_tx = 0;
-  stats.macCDCnt = 0;
-  stats.successful_tx = 0;
-  stats.total_rx = 0;
-  stats.total_tx = 0;
-  
-  stats.fromNode[1] = 0;
-  stats.fromNode[2] = 0;
-  stats.fromNode[3] = 0;
-  stats.fromNode[4] = 0;
-  stats.fromNode[5] = 0;
-  stats.fromNode[6] = 0;
-  stats.fromNode[7] = 0;
-  stats.fromNode[8] = 0;
-  stats.fromNode[9] = 0;
-  stats.fromNode[10] = 0;
-  stats.fromNode[11] = 0;
-  stats.fromNode[12] = 0;
-  stats.fromNode[13] = 0;
-  stats.fromNode[14] = 0;
-  stats.fromNode[15] = 0;
-  stats.fromNode[16] = 0;
-
 }
 
 
