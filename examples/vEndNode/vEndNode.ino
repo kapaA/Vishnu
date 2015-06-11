@@ -1,16 +1,16 @@
 /*  ============================================================================
-    Copyright (C) 2015 Achuthan Paramanathan.
-    RF24 lib. provided by 2011 J. Coliz <maniacbug@ymail.com>
-    ============================================================================
-    This program is free software; you can redistribute it and/or
-    modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-    ============================================================================
-    Revision Information:
-        File name: node.ino
-        Version:   v0.0
-        Date:      04-03-2015
-    ==========================================================================*/
+Copyright (C) 2015 Achuthan Paramanathan.
+RF24 lib. provided by 2011 J. Coliz <maniacbug@ymail.com>
+============================================================================
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+version 2 as published by the Free Software Foundation.
+============================================================================
+Revision Information:
+File name: node.ino
+Version:   v0.0
+Date:      04-03-2015
+==========================================================================*/
 
 /*============================================================================*/
 /*                           INCLUDE STATEMENTS                               */
@@ -26,10 +26,13 @@
 /*============================================================================*/
 /*                           PRIVATE DIFINES                                  */
 /*============================================================================*/
- #define DEBUG
- #define LED_DEBUG
- #define SLEEP_MODE
- #define DHT_SENSOR 
+//#define DEBUG
+//#define LED_DEBUG
+#define SLEEP_MODE
+#define DHT_SENSOR
+
+
+#define DHT_ON_PIN 3
 
 #define DHTPIN A2
 #define DHTTYPE DHT11   // DHT 11
@@ -69,7 +72,7 @@ struct statistics
 
 statistics stats;
 
-int battVolts; 
+int battVolts;
 
 /*============================================================================*/
 /*                   LOCAL EXPORTED FUNCTION DECLARATIONS                     */
@@ -88,30 +91,28 @@ int sendPayload(VDFrame fr);
 ==============================================================================*/
 void setup()
 {
-  // turn off brown-out enable in software
-  MCUCR = bit (BODS) | bit (BODSE);
-  MCUCR = bit (BODS);
+
   
   #ifdef DEBUG
-    //Start Serial communication
-    Serial.begin(57600);
-    delay(20);
-    //Printf helper function
-    printf_begin();
-    delay(1000);
+  //Start Serial communication
+  Serial.begin(57600);
+  delay(20);
+  //Printf helper function
+  printf_begin();
+  delay(1000);
   #endif
   
   #ifdef DHT_SENSOR
-    //Start the DHT sensor
-    dht.begin();
+  //Start the DHT sensor
+  dht.begin();
   #endif
   
   //Setup watchdog to interrupt every 1 sec.
-  setup_watchdog(wdt_1s);
-  // Start the transceiver   
+  setup_watchdog(wdt_8s);
+  // Start the transceiver
   radio.begin();
   radio.setPALevel(RF24_PA_MAX);
-  // Set the channel 
+  // Set the channel
   radio.setChannel(90);
   // set the delay between retries & # of retries
   radio.setRetries(15,15);
@@ -124,15 +125,18 @@ void setup()
   radio.startListening();
 
   #ifdef DEBUG
-    radio.printDetails();
+  radio.printDetails();
   #endif
 
   #ifdef LED_DEBUG
-    //LED pin configuration  
-    pinMode(GREEN, OUTPUT);
-    pinMode(YELLOW, OUTPUT);
-    pinMode(RED, OUTPUT);
+  //LED pin configuration
+  pinMode(GREEN, OUTPUT);
+  pinMode(YELLOW, OUTPUT);
+  pinMode(RED, OUTPUT);
   #endif
+  
+  pinMode(DHT_ON_PIN,OUTPUT);
+  
 }
 
 
@@ -147,25 +151,23 @@ void loop()
 {
   float t = 0, h = 0;
   // Data frame
-  VDFrame fr; 
+  VDFrame fr;
+  digitalWrite(DHT_ON_PIN, HIGH);
+  delay(200);
   
   seqNum++;
-  
-  
-  
+
   battVolts=getBandgap();  //Determins what actual Vcc is, (X 100), based on known bandgap voltage
   
-
-
   #ifdef DHT_SENSOR
-    dht.begin();
-    delay(300);
-    t = dht.readTemperature();
-    h = dht.readHumidity();
+  dht.begin();
+  delay(300);
+  t = dht.readTemperature();
+  h = dht.readHumidity();
   #endif
   
   fr.header.destAddr = BS_MAC_ID;
-  fr.header.srcAddr  = 19;
+  fr.header.srcAddr  = 3;
   fr.header.type     = 6;
   fr.payload.data[0] = battVolts/10;
   fr.payload.data[1] = (uint8_t) t;
@@ -175,14 +177,19 @@ void loop()
   sendPayload(fr);
 
   #ifdef SLEEP_MODE
-    // turn off the radio and go to sleep
-    radio.powerDown();
-    while( sleep_cycles_remaining )
-      do_sleep();
-      sleep_cycles_remaining = sleep_cycles_per_transmission;
-    radio.powerUp();
+  pinMode(DHT_ON_PIN,INPUT);
+  digitalWrite(DHT_ON_PIN, LOW);
+  // turn off the radio and go to sleep
+  radio.powerDown();
+  while( sleep_cycles_remaining )
+  {
+    do_sleep();
+  }    
+  sleep_cycles_remaining = sleep_cycles_per_transmission;
+  radio.powerUp();
+  pinMode(DHT_ON_PIN,OUTPUT);
   #endif
-} 
+}
 
 
 /*==============================================================================
@@ -201,41 +208,41 @@ int sendPayload(VDFrame fr)
   radio.stopListening();
   while(radio.testCarrier())
   {
-     #ifdef LED_DEBUG
-      digitalWrite(YELLOW, HIGH);
-     #endif
-     radio.startListening();
-     delayMicroseconds(128); // # 128uS at least to detect any carrier 
-     radio.stopListening();
-  }   
-  #ifdef LED_DEBUG  
-    digitalWrite(YELLOW, LOW);
-  #endif  
+    #ifdef LED_DEBUG
+    digitalWrite(YELLOW, HIGH);
+    #endif
+    radio.startListening();
+    delayMicroseconds(128); // # 128uS at least to detect any carrier
+    radio.stopListening();
+  }
+  #ifdef LED_DEBUG
+  digitalWrite(YELLOW, LOW);
+  #endif
   
   
   ok = radio.write( &fr, sizeof(fr) );
   
   if(ok)
   {
-    #ifdef LED_DEBUG  
-      digitalWrite(GREEN, !digitalRead(GREEN));
+    #ifdef LED_DEBUG
+    digitalWrite(GREEN, !digitalRead(GREEN));
     #endif
     stats.successful_tx++;
-  } 
+  }
   else
   {
     digitalWrite(RED, !digitalRead(RED));
     stats.failed_tx++;
   }
-   
+  
 }
 
 
 /*==============================================================================
 ** Function...: setup
 ** Return.....: void
-** Description: watchdog  setup. 
-**              Arguments: 
+** Description: watchdog  setup.
+**              Arguments:
 **              0=16ms, 1=32ms,2=64ms,3=125ms,4=250ms,5=500ms
 **              6=1 sec,7=2 sec, 8=4 sec, 9= 8sec
 ** Created....: 28.11.2014 by Achuthan
@@ -279,11 +286,15 @@ void do_sleep(void)
   set_sleep_mode(SLEEP_MODE_PWR_DOWN); // sleep mode is set here
   sleep_enable();
   
+    // turn off brown-out enable in software
+    MCUCR = bit (BODS) | bit (BODSE);
+    MCUCR = bit (BODS);
+    
   keep_ADCSRA  = ADCSRA;
   // disable ADC
   ADCSRA = 0;
 
-  sleep_mode();                // System sleeps here
+  sleep_cpu();                // System sleeps here
 
   // enable ADC
   ADCSRA = keep_ADCSRA;

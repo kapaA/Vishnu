@@ -25,7 +25,7 @@
 /*                           PRIVATE DIFINES                                  */
 /*============================================================================*/
 
-#define PRINT_ONE_SEC
+//#define PRINT_ONE_SEC
 
 /*============================================================================*/
 /*                           Hardware configuration                           */
@@ -130,7 +130,7 @@ void loop(void)
         #ifndef PRINT_ONE_SEC
           printf("%d %d %d %lu %d %d\n",
           frRx.header.srcAddr, frRx.header.destAddr, frRx.header.type,
-          frRx.payload.seqNum, frRx.payload.data[0], frRx.payload.data[0] );
+          frRx.payload.seqNum, frRx.payload.data[0], frRx.payload.data[1] );
         #endif
       }
     }

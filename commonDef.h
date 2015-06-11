@@ -62,7 +62,7 @@ typedef enum
 typedef enum { role_end_node = 1, role_base_station  } role_e;
 
 // MAC address ID
-#define BS_MAC_ID        0x3F
+#define BS_MAC_ID        0x02
 #define UNDEFINED_MAC_ID 0x00
 
 // EEPROM
