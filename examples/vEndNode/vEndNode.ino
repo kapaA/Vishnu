@@ -31,7 +31,6 @@ Date:      04-03-2015
 #define SLEEP_MODE
 #define DHT_SENSOR
 
-
 #define DHT_ON_PIN 3
 
 #define DHTPIN A2
@@ -108,7 +107,7 @@ void setup()
   #endif
   
   //Setup watchdog to interrupt every 1 sec.
-  setup_watchdog(wdt_8s);
+  setup_watchdog(wdt_1s);
   // Start the transceiver
   radio.begin();
   radio.setPALevel(RF24_PA_MAX);
@@ -153,24 +152,25 @@ void loop()
   // Data frame
   VDFrame fr;
   digitalWrite(DHT_ON_PIN, HIGH);
-  delay(200);
+  delay(1);
   
   seqNum++;
 
-  battVolts=getBandgap();  //Determins what actual Vcc is, (X 100), based on known bandgap voltage
+  battVolts=getBandgap();  //Determines what actual Vcc is, (X 100), based on known bandgap voltage
   
   #ifdef DHT_SENSOR
   dht.begin();
-  delay(300);
+  delay(20);
   t = dht.readTemperature();
   h = dht.readHumidity();
   #endif
   
   fr.header.destAddr = BS_MAC_ID;
-  fr.header.srcAddr  = 3;
-  fr.header.type     = 6;
+  fr.header.srcAddr  = 9;
+  fr.header.type     = 8;
   fr.payload.data[0] = battVolts/10;
   fr.payload.data[1] = (uint8_t) t;
+  //fr.payload.data[2] = (uint8_t) h;
   fr.payload.seqNum = seqNum;
 
   // Send the payload
@@ -178,6 +178,10 @@ void loop()
 
   #ifdef SLEEP_MODE
   pinMode(DHT_ON_PIN,INPUT);
+  pinMode(GREEN, INPUT);
+  pinMode(YELLOW, INPUT);
+  pinMode(RED, INPUT);
+  
   digitalWrite(DHT_ON_PIN, LOW);
   // turn off the radio and go to sleep
   radio.powerDown();
